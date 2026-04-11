@@ -39,19 +39,19 @@ Options:
 Search using the bundled dataset:
 
 ```bash
-cargo run -- datos.csv "andorra la vella"
+cargo run -- data.csv "andorra la vella"
 ```
 
 Read from standard input instead of a file:
 
 ```bash
-cat datos.csv | cargo run -- "andorra la vella"
+cat data.csv | cargo run -- "andorra la vella"
 ```
 
 Suppress the error message when no result is found:
 
 ```bash
-cargo run -- --quiet datos.csv "not-a-city"
+cargo run -- --quiet data.csv "not-a-city"
 ```
 
 ## CSV Format
@@ -63,12 +63,6 @@ The program deserializes rows using the following CSV headers:
 - `Population`
 
 Other columns may exist in the file and are ignored. Rows without a population are skipped.
-
-The included `datos.csv` uses a broader schema like:
-
-```text
-Country,City,AccentCity,Region,Population,Latitude,Longitude
-```
 
 ## Notes
 
