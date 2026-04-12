@@ -1,7 +1,7 @@
 # city-pop
 
 `city-pop` is a small Rust command-line program that looks up city populations from a CSV file.
-It is a modern adaptation of an example originally published by Andrew Gallant ([@BurntSushi](https://github.com/BurntSushi)), updated to use current Rust idioms and `serde`-based deserialization.
+It is a modern adaptation of an example originally published by Andrew Gallant ([@BurntSushi](https://github.com/BurntSushi)), updated to use current Rust idioms, `clap` for argument parsing, and `serde`-based deserialization.
 
 ## What It Does
 
@@ -26,12 +26,18 @@ Run the compiled binary from `target/release/city-pop`, or use `cargo run` durin
 ## Usage
 
 ```text
-USAGE: city-pop [options] [<data-path>] <city>
-       city-pop --help
+Search for city populations in CSV files
+
+Usage: city-pop [OPTIONS] <CITY> [DATA_PATH]
+
+Arguments:
+  <CITY>       Name of the city to search
+  [DATA_PATH]  Path to the data file (if omitted, standard input is used)
 
 Options:
-    -h, --help  Show this usage message.
-    -q, --quiet
+  -q, --quiet    Do not print errors if the city is not found
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 ## Examples
@@ -39,7 +45,7 @@ Options:
 Search using the bundled dataset:
 
 ```bash
-cargo run -- data.csv "andorra la vella"
+cargo run -- "andorra la vella" data.csv
 ```
 
 Read from standard input instead of a file:
@@ -51,7 +57,7 @@ cat data.csv | cargo run -- "andorra la vella"
 Suppress the error message when no result is found:
 
 ```bash
-cargo run -- --quiet data.csv "not-a-city"
+cargo run -- --quiet "not-a-city" data.csv
 ```
 
 ## CSV Format
@@ -68,7 +74,7 @@ Other columns may exist in the file and are ignored. Rows without a population a
 
 - Matching is currently exact and case-sensitive.
 - If multiple rows have the same city name and population data, all of them are printed.
-- When `<data-path>` is omitted, the program reads CSV data from standard input.
+- When `[DATA_PATH]` is omitted, the program reads CSV data from standard input.
 
 ## Credit
 

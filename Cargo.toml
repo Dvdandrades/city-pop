@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
 csv = "1.4.0"
-docopt = "1.1.1"
-rustc-serialize = "0.3.25"
-serde = "1.0.228"
+serde = { version = "1.0.228", features = ["derive"] }

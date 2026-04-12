@@ -3,24 +3,21 @@ use std::io;
 use std::path::Path;
 use std::fs;
 use std::process;
-use docopt::Docopt;
 use serde::Deserialize;
 use std::error::Error;
+use clap::Parser;
 
-static USAGE: &'static str = "
-USAGE: city-pop [options] [<data-path>] <city>
-       city-pop --help
-        
-Options:
-    -h, --help  Show this usage message.
-    -q, --quiet
-";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Parser)]
+#[command(name="city-pop", version, about="Search for city populations in CSV files")]
 struct Args {
-    arg_data_path: Option<String>,
-    arg_city: String,
-    flag_quiet: bool,
+    /// Name of the city to search
+    city: String,
+    /// Path to the data file (if omitted, standard input is used)
+    data_path: Option<String>,
+    /// Do not print errors if the city is not found
+    #[arg(short, long)]
+    quiet: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,12 +107,10 @@ fn search<P: AsRef<Path>>(file_path: &Option<P>, city: &str)
 } 
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.deserialize())
-                            .unwrap_or_else(|err| err.exit());
+    let args: Args = Args::parse();
 
-    match search(&args.arg_data_path, &args.arg_city) {
-        Err(CliError::NotFound) if args.flag_quiet => process::exit(1),
+    match search(&args.data_path, &args.city) {
+        Err(CliError::NotFound) if args.quiet => process::exit(1),
         Err(err) => fatal!("{}", err),
         Ok(pops) => for pop in pops {
             println!("{}, {}: {:?}", pop.city, pop.country, pop.count);
