@@ -1,9 +1,8 @@
-use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process;
 use clap::{Parser, ValueHint};
-use city_pop::{search, CliError};
+use city_pop::{search, search_file, CliError};
 
 #[derive(Debug, Parser)]
 #[command(name="city-pop", version, about="Search for city populations in CSV files")]
@@ -24,10 +23,7 @@ fn main() {
     let args = Args::parse();
 
     let result = match args.data_path {
-        Some(ref path) => match fs::File::open(path) {
-            Ok(file) => search(file, &args.city),
-            Err(err) => Err(CliError::Io(err)),
-        },
+        Some(ref path) => search_file(path, &args.city),
         None => search(io::stdin(), &args.city),
     };
 

@@ -1,8 +1,14 @@
 use std::fmt;
 use std::io;
 use std::error::Error;
+use std::io::Read;
 use serde::Deserialize;
 use unicase::UniCase;
+use memmap2::Mmap;
+use std::fs;
+use rayon::prelude::*;
+use std::path::Path;
+use memchr::memchr;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -84,6 +90,66 @@ pub fn search<R: io::Read>(reader: R, city: &str) -> Result<Vec<PopulationCount>
     } else {
         Ok(found)
     }
+}
+
+pub fn search_file(path: &Path, city: &str) -> Result<Vec<PopulationCount>, CliError> {
+    let file = fs::File::open(path)?;
+    let mmap = unsafe { Mmap::map(&file)? };
+
+    let header_end = mmap.iter()
+                                .position(|&b| b == b'\n')
+                                .map(|p| p + 1)
+                                .unwrap_or(mmap.len());
+
+    let header = &mmap[..header_end];
+    let data = &mmap[header_end..];
+
+    let n_threads = rayon::current_num_threads();
+    let chunk_size = (data.len() / n_threads).max(64 * 1024);
+    let chunks = split_at_newlines(data, chunk_size);
+
+    let city = UniCase::new(city);
+
+    let found: Vec<PopulationCount> = chunks.into_par_iter()
+                                            .flat_map(|chunk| {
+                                                let reader = header.chain(chunk);
+                                                let mut rdr = csv::Reader::from_reader(reader);
+                                                rdr.deserialize::<Row>()
+                                                .filter_map(|r| r.ok())
+                                                .filter(|row| UniCase::new(row.city.as_str()) == city)
+                                                .filter_map(|row| {
+                                                    row.population.map(|count| PopulationCount {
+                                                        city: row.city,
+                                                        country: row.country,
+                                                        count,
+                                                    })
+                                                }).collect::<Vec<_>>()
+                                            }).collect();
+        if found.is_empty() {
+            Err(CliError::NotFound)
+        } else {
+            Ok(found)
+        }
+}
+
+fn split_at_newlines(data: &[u8], chunk_size: usize) -> Vec<&[u8]> {
+    let mut chunks = Vec::new();
+    let mut start = 0;
+
+    while start < data.len() {
+        let end_hint = (start + chunk_size).min(data.len());
+        
+        let end = if end_hint < data.len() {
+            memchr(b'\n', &data[end_hint..])
+                .map(|rel| end_hint + rel + 1)
+                .unwrap_or(data.len())
+        } else {
+            data.len()
+        };
+        chunks.push(&data[start..end]);
+        start = end;
+    }
+    chunks
 }
 
 #[cfg(test)]
