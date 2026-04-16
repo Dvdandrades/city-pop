@@ -71,19 +71,8 @@ impl From<csv::Error> for CliError {
 }
 
 pub fn search<R: io::Read>(reader: R, city: &str) -> Result<Vec<PopulationCount>, CliError> {
-    let mut rdr = csv::Reader::from_reader(reader);
     let city = UniCase::new(city);
-
-    let found: Vec<PopulationCount> = rdr.deserialize::<Row>()
-                                        .filter_map(|result| result.ok())
-                                        .filter(|row| UniCase::new(row.city.as_str()) == city)
-                                        .filter_map(|row| {
-                                            row.population.map(|count| PopulationCount {
-                                                city: row.city,
-                                                country: row.country,
-                                                count,
-                                            })
-                                        }).collect();
+    let found = collect_matches(reader, city);
     
     if found.is_empty() {
         Err(CliError::NotFound)
@@ -122,20 +111,8 @@ pub fn search_file(path: &Path, city: &str) -> Result<Vec<PopulationCount>, CliE
     // can resolve column names for deserialization. The header is a single line,
     // so the per-chunk overhead is negligible.
     let found: Vec<PopulationCount> = chunks.into_par_iter()
-                                            .flat_map(|chunk| {
-                                                let reader = header.chain(chunk);
-                                                let mut rdr = csv::Reader::from_reader(reader);
-                                                rdr.deserialize::<Row>()
-                                                .filter_map(|r| r.ok())
-                                                .filter(|row| UniCase::new(row.city.as_str()) == city)
-                                                .filter_map(|row| {
-                                                    row.population.map(|count| PopulationCount {
-                                                        city: row.city,
-                                                        country: row.country,
-                                                        count,
-                                                    })
-                                                }).collect::<Vec<_>>()
-                                            }).collect();
+                                            .flat_map(|chunk| collect_matches(header.chain(chunk), city))
+                                            .collect();
         if found.is_empty() {
             Err(CliError::NotFound)
         } else {
@@ -161,6 +138,24 @@ fn split_at_newlines(data: &[u8], chunk_size: usize) -> Vec<&[u8]> {
         start = end;
     }
     chunks
+}
+
+fn row_to_population(row: Row, city: UniCase<&str>) -> Option<PopulationCount> {
+    if UniCase::new(row.city.as_str()) != city {
+        return None;
+    }
+    row.population.map(|count| PopulationCount { 
+        city: row.city, 
+        country: row.country, 
+        count,
+    })
+}
+
+fn collect_matches<R: io::Read>(reader: R, city: UniCase<&str>) -> Vec<PopulationCount> {
+    let mut rdr = csv::Reader::from_reader(reader);
+    rdr.deserialize::<Row>().filter_map(|result| result.ok())
+                            .filter_map(|row| row_to_population(row, city))
+                            .collect()
 }
 
 #[cfg(test)]
