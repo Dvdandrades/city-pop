@@ -211,4 +211,45 @@ mod tests {
         let result = search(csv(data), "Springfield").unwrap();
         assert_eq!(result.len(), 2);
     }
+
+    #[test]
+    fn split_smaller_than_chunk_size_yields_one_chunk() {
+        let data = b"hello\nworld\n";
+        let chunks = split_at_newlines(data, 1024);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], data);
+    }
+
+    #[test]
+    fn split_empty_data_yields_no_chunks() {
+        let chunks = split_at_newlines(b"", 64);
+        assert!(chunks.is_empty());
+    }
+
+    #[test]
+    fn split_chunks_cover_all_data_without_gaps() {
+        let data = b"line1\nline2\nline3\nline4\nline5\n";
+        let chunks = split_at_newlines(data, 8);
+        let reconstructed: Vec<u8> = chunks.concat();
+        assert_eq!(reconstructed, data);
+    }
+
+    #[test]
+    fn split_chunks_always_end_on_newline_boundaries() {
+        let data = b"aaaa\nbbbb\ncccc\ndddd\n";
+        let chunks = split_at_newlines(data, 6);
+        for chunk in &chunks {
+            if !chunk.is_empty() {
+                assert_eq!(chunk[chunk.len() - 1], b'\n');
+            }
+        }
+    }
+
+    #[test]
+    fn split_data_without_trailing_newline() {
+        let data = b"line1\nline2\nno_newline_at_end";
+        let chunks = split_at_newlines(data, 8);
+        let reconstructed: Vec<u8> = chunks.concat();
+        assert_eq!(reconstructed, data);
+    }
 }
