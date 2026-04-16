@@ -1,29 +1,29 @@
 # city-pop
 
-`city-pop` is a small Rust command-line program that looks up city populations from a CSV file.
-It is a modern adaptation of an example originally published by Andrew Gallant ([@BurntSushi](https://github.com/BurntSushi)), updated to use current Rust idioms, `clap` for argument parsing, and `serde`-based deserialization.
+`city-pop` is a Rust CLI and library for looking up city populations from CSV data.
+It supports reading from standard input or, when given a file path, using a memory-mapped and parallelized search path for larger datasets.
 
-## What It Does
+The project is a modernized take on an example originally published by Andrew Gallant ([@BurntSushi](https://github.com/BurntSushi)), updated with `clap`, `serde`, `memmap2`, and `rayon`.
 
-Given a city name, the program searches a CSV dataset and prints every matching city with a recorded population:
+## Features
 
-```text
-andorra la vella, ad: 20430
-```
-
-If no matching populated city is found, it returns an error message. With `--quiet`, it exits with status code `1` instead of printing that message.
+- Exact, case-insensitive city matching
+- CSV deserialization with `serde`
+- Reads from `stdin` or a file path
+- Faster file-backed searches via memory mapping and parallel chunk processing
+- Reusable library API in addition to the CLI
 
 ## Installation
 
-Build it with Cargo:
+Build the project with Cargo:
 
 ```bash
 cargo build --release
 ```
 
-Run the compiled binary from `target/release/city-pop`, or use `cargo run` during development.
+Run the binary from `target/release/city-pop`, or use `cargo run` while developing.
 
-## Usage
+## CLI Usage
 
 ```text
 Search for city populations in CSV files
@@ -42,40 +42,67 @@ Options:
 
 ## Examples
 
-Search using the bundled dataset:
+Search a CSV file:
 
 ```bash
-cargo run -- "andorra la vella" data.csv
+cargo run -- "Andorra la Vella" data.csv
 ```
 
-Read from standard input instead of a file:
+Read from standard input:
 
 ```bash
-cat data.csv | cargo run -- "andorra la vella"
+cat data.csv | cargo run -- "Andorra la Vella"
 ```
 
-Suppress the error message when no result is found:
+Return a non-zero exit code without printing the not-found message:
 
 ```bash
 cargo run -- --quiet "not-a-city" data.csv
 ```
 
+Typical output:
+
+```text
+andorra la vella, ad: 20430
+```
+
+If multiple rows match the same city name and have a population, every match is printed.
+
 ## CSV Format
 
-The program deserializes rows using the following CSV headers:
+The library deserializes rows using these headers:
 
 - `Country`
 - `City`
 - `Population`
 
-Other columns may exist in the file and are ignored. Rows without a population are skipped.
+Additional columns are ignored. Rows with an empty `Population` value are skipped.
+
+## Library Usage
+
+Use `search` when you already have a reader, and `search_file` when you want the optimized file-backed path:
+
+```rust
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
+use city_pop::{search, search_file};
+
+let reader = BufReader::new(File::open("data.csv")?);
+let from_reader = search(reader, "madrid")?;
+
+let from_file = search_file(Path::new("data.csv"), "madrid")?;
+```
+
+Both functions return a `Vec<PopulationCount>` and report `CliError::NotFound` when no populated matches exist.
 
 ## Notes
 
-- Matching is currently exact and case-sensitive.
-- If multiple rows have the same city name and population data, all of them are printed.
-- When `[DATA_PATH]` is omitted, the program reads CSV data from standard input.
+- Matching is exact but case-insensitive.
+- Unicode city names are supported.
+- When a file path is provided, the file is opened read-only and searched in newline-aligned chunks in parallel.
+- When no data path is provided, the CLI reads CSV content from standard input.
 
 ## Credit
 
-This project is intentionally rooted in Andrew Gallant's teaching style and original CSV/CLI examples. The core idea comes from his work, while this version updates the implementation for a more modern Rust toolchain and dependency stack.
+This project is intentionally rooted in Andrew Gallant's teaching style and original CSV/CLI examples, with the implementation refreshed for a modern Rust toolchain.
