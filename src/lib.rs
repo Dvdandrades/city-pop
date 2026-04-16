@@ -94,6 +94,10 @@ pub fn search<R: io::Read>(reader: R, city: &str) -> Result<Vec<PopulationCount>
 
 pub fn search_file(path: &Path, city: &str) -> Result<Vec<PopulationCount>, CliError> {
     let file = fs::File::open(path)?;
+
+    // SAFETY: The file is opened read-only and must not be modified or truncated
+    // externally while this mmap is alive. This is a documented precondition for
+    // callers; violating it is undefined behaviour at the OS level.
     let mmap = unsafe { Mmap::map(&file)? };
 
     let header_end = mmap.iter()
@@ -105,11 +109,18 @@ pub fn search_file(path: &Path, city: &str) -> Result<Vec<PopulationCount>, CliE
     let data = &mmap[header_end..];
 
     let n_threads = rayon::current_num_threads();
+
+    // chunk_size is a best-effort estimate. Because chunks are split on newline
+    // boundaries, actual sizes may vary for files with very long lines.
+    // Rayon's work-stealing scheduler handles any resulting imbalance.
     let chunk_size = (data.len() / n_threads).max(64 * 1024);
     let chunks = split_at_newlines(data, chunk_size);
 
     let city = UniCase::new(city);
 
+    // Each chunk is prefixed with the original CSV header so that csv::Reader
+    // can resolve column names for deserialization. The header is a single line,
+    // so the per-chunk overhead is negligible.
     let found: Vec<PopulationCount> = chunks.into_par_iter()
                                             .flat_map(|chunk| {
                                                 let reader = header.chain(chunk);
